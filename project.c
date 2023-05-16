@@ -23,7 +23,9 @@ void dino(int walk)
         jump = 0;
     } else if (walk == 1) {
         jump += 2;
-    } else jump -= 2;
+    } else {
+        jump -= 2;
+    }
     
     /*dino body*/
     mvprintw(15 - jump, 2, "                 ");
@@ -73,7 +75,7 @@ int game_logic(int speed, int *score, bool* game_end)
     /*get score*/
     if (x > 55 && x < 69 && jump == 10) {
     	x = 0; 
-    	score++;
+    	(*score)++;
 
     	if (speed > 10000) {
             speed -= 1000;
