@@ -1,12 +1,16 @@
 #include <stdio.h>
-
 #include <ncurses.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h> 
+#include <pthread.h>
 /*#include <windows.h>*/
 
 int jump, speed = 100000;
+int score = 0;
+bool game_end = false;
+
+pthread_mutex_t score_mutex;
 
 void title()
 {
@@ -58,7 +62,27 @@ void dino(int walk)
     printf("\n");
    
 }
-int game_logic(int speed, int *score, bool* game_end)
+
+void* score_counter(void* arg) 
+{
+    static int x;
+
+    while (!game_logic) {
+        pthread_mutex_lock(&score_mutex);
+
+        if (x > 55 && x < 69 && jump == 10) {
+            score++;
+        }
+
+        pthread_mutex_unlock(&score_mutex);
+        
+        usleep(10000);
+    }
+
+    return NULL;
+}
+
+int game_logic()
 {
     static int x;
 
@@ -75,32 +99,39 @@ int game_logic(int speed, int *score, bool* game_end)
     /*get score*/
     if (x > 55 && x < 69 && jump == 10) {
     	x = 0; 
-    	(*score)++;
+        pthread_mutex_lock(&score_mutex);
+    	score++;
+        pthread_mutex_unlock(&score_mutex);
 
     	if (speed > 10000) {
             speed -= 1000;
         }
-        
-        if (*score == 10) {
-            *game_end = true;
-        }
     }
 
     mvprintw(2, 53, "%d", 10 - (*score));
+
+    if (x > 69 && jump != 10) {
+        game_end = true;
+    }
+
     return speed;
 }
  
 int main() {
     char press;
     bool paused = false;
-    bool game_end = false;
-    int score = 0;
+
+    pthread_t score_thread;
 
     initscr();
     noecho();
     nodelay(stdscr, TRUE);
 
-    while (true) {
+    pthread_mutex_init(&score_mutex, NULL);
+
+    pthread_create(&score_thread, NULL, score_counter, NULL);
+
+    while (!game_end) {
     	press = getch();
 
     	if (press == ' ') {
@@ -111,7 +142,7 @@ int main() {
     	     	clear();
     	     	title();
     	     	dino(1);
-    	     	game_logic(speed, &score, &game_end);
+    	     	game_logic();
     	     	refresh();
     	     	usleep(speed);
                 }
@@ -120,7 +151,7 @@ int main() {
     	        clear();
     	        title();
     	     	dino(2);
-    	     	game_logic(speed, &score, &game_end);
+    	     	game_logic();
     	     	refresh();
     	     	usleep(speed);
                 }
@@ -132,6 +163,7 @@ int main() {
                 game_end = false;
                 speed = 200000;
                 score = 0;
+                pthread_create(&score_thread, NULL, score_counter, NULL);
             }
         }
 
@@ -139,7 +171,10 @@ int main() {
             clear();
             title();
             dino(0);
-            game_logic(speed, &score, &game_end);
+            game_logic();
+            pthread_mutex_lock(&score_mutex);
+            mvprintw(2, 53, "%d", score);
+            pthread_mutex_unlock(&score_mutex);
             refresh();
             usleep(speed);
         } else if (game_end) {
@@ -147,4 +182,7 @@ int main() {
             refresh();
         }
     }
+
+    pthread_mutex_destroy(&score_mutex);
+    pthread_mutex_join(score_thread, NULL);
 }
