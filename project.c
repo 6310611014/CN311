@@ -108,7 +108,7 @@ int game_logic()
         }
     }
 
-    mvprintw(2, 53, "%d", 10 - (*score));
+    mvprintw(2, 53, "%d", score);
 
     if (x > 69 && jump != 10) {
         game_end = true;
