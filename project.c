@@ -4,18 +4,28 @@
 #include <time.h>
 #include <unistd.h> 
 #include <pthread.h>
-/*#include <windows.h>*/
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <string.h>
+
+#define MAX_MSG 1024
 
 int jump, speed = 100000;
 int score = 0;
 bool game_end = false;
+bool paused = false;
+int x;
+char press;
+char highscore_str[1024];
 
 pthread_mutex_t score_mutex;
 
 void title()
 {
-    mvprintw(1, 30, "Press P to pause, Press spacebar to jump");
-    mvprintw(2, 30, "COIN:");
+    mvprintw(0, 30, "Detail: Press P to pause, Press spacebar to jump.");
+    mvprintw(1, 30, "        Press X to exit, Press R to restart.");
+    mvprintw(2, 30, "COIN: %d, High Score: %s", score, highscore_str);
 }
 
 void dino(int walk)
@@ -32,7 +42,6 @@ void dino(int walk)
     }
     
     /*dino body*/
-    mvprintw(15 - jump, 2, "                 ");
     mvprintw(16 - jump, 2, "         ��������");
     mvprintw(17 - jump, 2, "         � ^ ����");
     mvprintw(18 - jump, 2, "         ��������");
@@ -63,29 +72,8 @@ void dino(int walk)
    
 }
 
-void* score_counter(void* arg) 
+int coin()
 {
-    static int x;
-
-    while (!game_logic) {
-        pthread_mutex_lock(&score_mutex);
-
-        if (x > 55 && x < 69 && jump == 10) {
-            score++;
-        }
-
-        pthread_mutex_unlock(&score_mutex);
-        
-        usleep(10000);
-    }
-
-    return NULL;
-}
-
-int game_logic()
-{
-    static int x;
-
     /*a coin*/
     mvprintw(3, 74 - x, " ����\n");
     mvprintw(4, 74 - x, "������\n" );
@@ -95,20 +83,6 @@ int game_logic()
     if (x > 74) {
     	x = 0;
     }
-    
-    /*get score*/
-    if (x > 55 && x < 69 && jump == 10) {
-    	x = 0; 
-        pthread_mutex_lock(&score_mutex);
-    	score++;
-        pthread_mutex_unlock(&score_mutex);
-
-    	if (speed > 10000) {
-            speed -= 1000;
-        }
-    }
-
-    mvprintw(2, 53, "%d", score);
 
     if (x > 69 && jump != 10) {
         game_end = true;
@@ -116,12 +90,78 @@ int game_logic()
 
     return speed;
 }
+
+/*get score*/
+void* score_speed(void* arg) 
+{
+    while (press != 'x' || press != 'X') {
+        if (x > 55 && x < 69 && jump == 10) {
+    	    x = 0; 
+            pthread_mutex_lock(&score_mutex);
+    	    score++;
+            pthread_mutex_unlock(&score_mutex);
+	
+    	    if (speed > 10000) {
+            	speed -= 1000;
+            }
+        }
+    }
+    return NULL;
+}
+
+/*input*/
+void* user_input(void* arg) {
+    while (press != 'x' || press != 'X') {
+        if (!game_end) {
+	    if (press == ' ') {
+		if (paused) {
+		    paused = false;
+		}  
+	    } /*p to paused game */
+		
+	    if (press == 'p' || press == 'P') {
+			paused = !paused;
+		    }
+	}
+		    
+	/*p to restart game */
+	if (press == 'r' || press == 'R') {
+	    paused = false;
+	    game_end = false;
+	    speed = 100000;
+	    score = 0;
+	    x = 0;
+	}
+    }
+}
+
+/*high_score*/
+void* high_score(void* arg) {
+    int sd;  
+    struct sockaddr_in servAddr;
+    
+    sd = socket(AF_INET, SOCK_STREAM, 0);
+    servAddr.sin_family = AF_INET;
+    servAddr.sin_port = htons(5000);
+    inet_aton("127.0.0.1", &servAddr.sin_addr);
+    connect(sd, (struct sockaddr *) &servAddr, sizeof(servAddr));
+    
+    recv(sd, highscore_str, MAX_MSG, 0);
+    while (press != 'x' || press != 'X') {
+    	if (score > atoi(highscore_str)) {
+      	    sprintf(highscore_str, "%d",score);
+    	}
+    }
+    send(sd, highscore_str, sizeof(highscore_str), 0);
+
+}
+
+
+
+/*void draw()*/
  
 int main() {
-    char press;
-    bool paused = false;
-
-    pthread_t score_thread;
+    pthread_t score_thread, input_thread, highscore_thread, coin_thread;
 
     initscr();
     noecho();
@@ -129,60 +169,60 @@ int main() {
 
     pthread_mutex_init(&score_mutex, NULL);
 
-    pthread_create(&score_thread, NULL, score_counter, NULL);
+    pthread_create(&score_thread, NULL, score_speed, NULL);
+    pthread_create(&input_thread, NULL, user_input, NULL);
+    pthread_create(&highscore_thread, NULL, high_score, NULL);
 
-    while (!game_end) {
-    	press = getch();
+    while (true) {
+        press = getch();
+    
+        if (!game_end && !paused) {
+	/*space bar to unpaused game or jump */
+	     if (press == ' ') {
+		     for (int i = 0; i < 5; i++) {
+		   	clear();
+		    	title();
+		    	dino(1);
+		    	coin();
+		    	refresh();
+		    	usleep(speed);
+		     }
+		        
+		     for (int j = 0; j < 5; j++) {
+		    	clear();
+		    	title();
+		    	dino(2);
+		    	coin();
+		    	refresh();
+		    	usleep(speed);
+		     }
+		}
 
-    	if (press == ' ') {
-            if (paused) {
-                paused = false;
-            } else {
-                for (int i = 0; i < 5; i++) {
-    	     	clear();
-    	     	title();
-    	     	dino(1);
-    	     	game_logic();
-    	     	refresh();
-    	     	usleep(speed);
-                }
-                
-                for (int j = 0; j < 5; j++) {
-    	        clear();
-    	        title();
-    	     	dino(2);
-    	     	game_logic();
-    	     	refresh();
-    	     	usleep(speed);
-                }
-            }	     
-    	} else if (press == 'p' || press == 'P') {
-            paused = !paused;
-        } else if (press == 'r' || press == 'R') {
-            if (game_end) {
-                game_end = false;
-                speed = 200000;
-                score = 0;
-                pthread_create(&score_thread, NULL, score_counter, NULL);
-            }
-        }
-
-        if (!paused && !game_end) {
-            clear();
-            title();
-            dino(0);
-            game_logic();
-            pthread_mutex_lock(&score_mutex);
-            mvprintw(2, 53, "%d", score);
-            pthread_mutex_unlock(&score_mutex);
-            refresh();
-            usleep(speed);
+	    /*nomal walk */
+	    else {
+		clear();
+		title();
+		dino(0);
+		coin();
+		refresh();
+		usleep(speed);
+	    }
         } else if (game_end) {
-            mvprintw(10, 30, "You collected all the coins! Press R to restart");
-            refresh();
-        }
+	     clear();
+	     mvprintw(10, 30, "The End! Press R to restart");
+	     mvprintw(11, 37, "Press X to exit");
+	     refresh();
+	     usleep(speed);
+	}
+        
+	if (press == 'x' || press == 'X') {
+		return 0;
+	}	
+        
     }
-
     pthread_mutex_destroy(&score_mutex);
-    pthread_mutex_join(score_thread, NULL);
+    pthread_join(score_thread, NULL);
+    pthread_join(input_thread, NULL);
+    pthread_join(highscore_thread, NULL);
+    /*pthread_join(draw_thread, NULL);*/
 }
