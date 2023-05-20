@@ -147,12 +147,12 @@ void* high_score(void* arg) {
     connect(sd, (struct sockaddr *) &servAddr, sizeof(servAddr));
     
     recv(sd, highscore_str, MAX_MSG, 0);
-    while (press != 'x' || press != 'X') {
+    while (press) {
     	if (score > atoi(highscore_str)) {
       	    sprintf(highscore_str, "%d",score);
     	}
     	
-    	if (game_end) {
+    	if (press == 'x' || press == 'X') {
     	    send(sd, highscore_str, sizeof(highscore_str), 0);
     	}
     }
@@ -217,14 +217,10 @@ int main() {
 	     usleep(speed);
 	}
         
-	if (press == 'x' || press == 'X') {
-		return 0;
-	}	
         
     }
     pthread_mutex_destroy(&score_mutex);
     pthread_join(score_thread, NULL);
     pthread_join(input_thread, NULL);
-    pthread_join(highscore_thread, NULL);
     /*pthread_join(draw_thread, NULL);*/
 }
