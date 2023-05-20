@@ -100,7 +100,7 @@ void* score_speed(void* arg)
             pthread_mutex_lock(&score_mutex);
     	    score++;
             pthread_mutex_unlock(&score_mutex);
-	
+	   
     	    if (speed > 10000) {
             	speed -= 1000;
             }
@@ -120,7 +120,7 @@ void* user_input(void* arg) {
 	    } /*p to paused game */
 		
 	    if (press == 'p' || press == 'P') {
-			paused = !paused;
+			paused = true;
 		    }
 	}
 		    
@@ -151,9 +151,11 @@ void* high_score(void* arg) {
     	if (score > atoi(highscore_str)) {
       	    sprintf(highscore_str, "%d",score);
     	}
+    	
+    	if (game_end) {
+    	    send(sd, highscore_str, sizeof(highscore_str), 0);
+    	}
     }
-    send(sd, highscore_str, sizeof(highscore_str), 0);
-
 }
 
 
@@ -161,7 +163,7 @@ void* high_score(void* arg) {
 /*void draw()*/
  
 int main() {
-    pthread_t score_thread, input_thread, highscore_thread, coin_thread;
+    pthread_t score_thread, input_thread, highscore_thread;
 
     initscr();
     noecho();

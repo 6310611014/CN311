@@ -32,9 +32,8 @@ int main(){
     	send(client_sd, send_score,  sizeof(send_score), 0);
     	recv(client_sd, rcv_score, MAX_MSG, 0);
     	high_score = atoi(rcv_score);
-    	printf("%d", high_score);
     	    
-    	close(client_sd);
+    	/*close(client_sd);*/
     }
     close(sd);
     return 0;
