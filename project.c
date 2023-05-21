@@ -10,7 +10,7 @@
 #include <string.h>
 
 #define MAX_MSG 1024
-#define NUM_THREADS 3
+#define NUM_THREADS 3 
 
 int jump, speed = 100000;
 int score = 0;
@@ -27,6 +27,7 @@ void title()
     mvprintw(2, 30, "COIN: %d, High Score: %s", score, highscore_str);
 }
 
+/*dinosaur body*/
 void dino(int walk)
 {
     static int a = 1;
@@ -102,6 +103,15 @@ void* score_counter(void* t)
             	speed -= 1000;
             }
         }
+        if (score >= 3) {
+            speed = 50000;
+        } 
+        if (score >= 7) {
+            speed = 20000;
+        }
+        if (score >= 15) {
+            speed = 10000;
+        }
     }
     return NULL;
 }
@@ -110,6 +120,7 @@ void* score_counter(void* t)
 void* user_input(void* t) {
     while (press != 'x' || press != 'X') {
         if (!game_end) {
+            /*spacebar for jump*/
             if (press == ' ') {
                 if (paused) {
                     paused = false;
@@ -156,8 +167,9 @@ void *high_score(void *t) {
 }
  
 int main() {
-    pthread_t thread[NUM_THREADS];
-    pthread_t score_thread, input_thread, highscore_thread;
+
+    pthread_t thread[NUM_THREADS]; /* ประกาศตัวแปรเพื่อเอาไว้สร้าง thread หลายๆ threads ใน loop */
+    pthread_t score_thread, input_thread, highscore_thread; /* ประกาศตัวแปรเพื่อเอาไว้สร้าง thread ของแต่ละ function */
     pthread_attr_t attr;
     int rc;
 
@@ -176,13 +188,14 @@ int main() {
         } else if (t == 2) {
             rc = pthread_create(&highscore_thread, &attr, high_score, (void *)&t);
         }
-
+        /* check if the thread are created successfully */
         if (rc) {
             printf("ERROR: at pthread_create");
             exit(-1);
         }
     }
 
+    /* join threads */
     for (int t = 0; t < NUM_THREADS; t++) {
         rc = pthread_join(thread[t], NULL);
     }
@@ -210,7 +223,8 @@ int main() {
                     refresh();
                     usleep(speed);
                 }
-		    } else { /*nomal walk */
+		    } else { 
+                /*normal walk */
                 clear();
                 title();
                 dino(0);
@@ -220,8 +234,8 @@ int main() {
             }
         } else if (game_end) {
             clear();
-            mvprintw(10, 30, "The End! Press R to restart");
-            mvprintw(11, 37, "Press X to exit");
+            mvprintw(10, 24, "Game Over! You collected %d coin(s).", score);
+            mvprintw(11, 23, "Press R to restart or Press X to exit.");
             refresh();
             usleep(speed);
 	    }  
