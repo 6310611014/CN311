@@ -10,6 +10,7 @@
 #include <string.h>
 
 #define MAX_MSG 1024
+#define NUM_THREADS 3
 
 int jump, speed = 100000;
 int score = 0;
@@ -18,8 +19,6 @@ bool paused = false;
 int x;
 char press;
 char highscore_str[1024];
-
-pthread_mutex_t score_mutex;
 
 void title()
 {
@@ -92,14 +91,12 @@ int coin()
 }
 
 /*get score*/
-void* score_speed(void* arg) 
+void* score_counter(void* t) 
 {
     while (press != 'x' || press != 'X') {
         if (x > 55 && x < 69 && jump == 10) {
     	    x = 0; 
-            pthread_mutex_lock(&score_mutex);
     	    score++;
-            pthread_mutex_unlock(&score_mutex);
 	   
     	    if (speed > 10000) {
             	speed -= 1000;
@@ -110,33 +107,33 @@ void* score_speed(void* arg)
 }
 
 /*input*/
-void* user_input(void* arg) {
+void* user_input(void* t) {
     while (press != 'x' || press != 'X') {
         if (!game_end) {
-	    if (press == ' ') {
-		if (paused) {
-		    paused = false;
-		}  
-	    } /*p to paused game */
-		
-	    if (press == 'p' || press == 'P') {
-			paused = true;
-		    }
-	}
+            if (press == ' ') {
+                if (paused) {
+                    paused = false;
+                }  
+	        } 
+            /*p to paused game */
+            if (press == 'p' || press == 'P') {
+                paused = true;
+            }
+	    }
 		    
-	/*p to restart game */
-	if (press == 'r' || press == 'R') {
-	    paused = false;
-	    game_end = false;
-	    speed = 100000;
-	    score = 0;
-	    x = 0;
-	}
+        /*r to restart game */
+        if (press == 'r' || press == 'R') {
+            paused = false;
+            game_end = false;
+            speed = 100000;
+            score = 0;
+            x = 0;
+        }
     }
 }
 
 /*high_score*/
-void* high_score(void* arg) {
+void *high_score(void *t) {
     int sd;  
     struct sockaddr_in servAddr;
     
@@ -157,70 +154,76 @@ void* high_score(void* arg) {
     	}
     }
 }
-
-
-
-/*void draw()*/
  
 int main() {
+    pthread_t thread[NUM_THREADS];
     pthread_t score_thread, input_thread, highscore_thread;
+    pthread_attr_t attr;
+    int rc;
 
     initscr();
     noecho();
     nodelay(stdscr, TRUE);
 
-    pthread_mutex_init(&score_mutex, NULL);
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-    pthread_create(&score_thread, NULL, score_speed, NULL);
-    pthread_create(&input_thread, NULL, user_input, NULL);
-    pthread_create(&highscore_thread, NULL, high_score, NULL);
+    for (int t = 0; t < NUM_THREADS; t++) {
+        if (t == 0) {
+            rc = pthread_create(&score_thread, &attr, score_counter, (void *)&t);
+        } else if (t == 1) {
+            rc = pthread_create(&input_thread, &attr, user_input, (void *)&t);
+        } else if (t == 2) {
+            rc = pthread_create(&highscore_thread, &attr, high_score, (void *)&t);
+        }
+
+        if (rc) {
+            printf("ERROR: at pthread_create");
+            exit(-1);
+        }
+    }
+
+    for (int t = 0; t < NUM_THREADS; t++) {
+        rc = pthread_join(thread[t], NULL);
+    }
 
     while (true) {
         press = getch();
     
         if (!game_end && !paused) {
-	/*space bar to unpaused game or jump */
-	     if (press == ' ') {
-		     for (int i = 0; i < 5; i++) {
-		   	clear();
-		    	title();
-		    	dino(1);
-		    	coin();
-		    	refresh();
-		    	usleep(speed);
-		     }
+	        /*space bar to unpaused game or jump */
+	        if (press == ' ') {
+		        for (int i = 0; i < 5; i++) {
+                    clear();
+                    title();
+                    dino(1);
+                    coin();
+                    refresh();
+                    usleep(speed);
+		        }
 		        
-		     for (int j = 0; j < 5; j++) {
-		    	clear();
-		    	title();
-		    	dino(2);
-		    	coin();
-		    	refresh();
-		    	usleep(speed);
-		     }
-		}
-
-	    /*nomal walk */
-	    else {
-		clear();
-		title();
-		dino(0);
-		coin();
-		refresh();
-		usleep(speed);
-	    }
+		        for (int j = 0; j < 5; j++) {
+                    clear();
+                    title();
+                    dino(2);
+                    coin();
+                    refresh();
+                    usleep(speed);
+                }
+		    } else { /*nomal walk */
+                clear();
+                title();
+                dino(0);
+                coin();
+                refresh();
+                usleep(speed);
+            }
         } else if (game_end) {
-	     clear();
-	     mvprintw(10, 30, "The End! Press R to restart");
-	     mvprintw(11, 37, "Press X to exit");
-	     refresh();
-	     usleep(speed);
-	}
-        
-        
+            clear();
+            mvprintw(10, 30, "The End! Press R to restart");
+            mvprintw(11, 37, "Press X to exit");
+            refresh();
+            usleep(speed);
+	    }  
     }
-    pthread_mutex_destroy(&score_mutex);
-    pthread_join(score_thread, NULL);
-    pthread_join(input_thread, NULL);
-    /*pthread_join(draw_thread, NULL);*/
 }
