@@ -98,20 +98,16 @@ void* score_counter(void* t)
         if (x > 55 && x < 69 && jump == 10) {
     	    x = 0; 
     	    score++;
-	   
-    	    if (speed > 10000) {
-            	speed -= 1000;
-            }
         }
-        if (score >= 3) {
-            speed = 50000;
-        } 
-        if (score >= 7) {
-            speed = 20000;
-        }
-        if (score >= 15) {
+        else if (score >= 15) {
             speed = 10000;
         }
+        else if (score >= 7) {
+            speed = 20000;
+        }
+        else if (score >= 3) {
+            speed = 50000;
+        } 
     }
     return NULL;
 }
@@ -168,7 +164,6 @@ void *high_score(void *t) {
  
 int main() {
 
-    pthread_t thread[NUM_THREADS]; /* ประกาศตัวแปรเพื่อเอาไว้สร้าง thread หลายๆ threads ใน loop */
     pthread_t score_thread, input_thread, highscore_thread; /* ประกาศตัวแปรเพื่อเอาไว้สร้าง thread ของแต่ละ function */
     pthread_attr_t attr;
     int rc;
@@ -193,11 +188,6 @@ int main() {
             printf("ERROR: at pthread_create");
             exit(-1);
         }
-    }
-
-    /* join threads */
-    for (int t = 0; t < NUM_THREADS; t++) {
-        rc = pthread_join(thread[t], NULL);
     }
 
     while (true) {
@@ -240,4 +230,9 @@ int main() {
             usleep(speed);
 	    }  
     }
+
+    /* join threads */
+    pthread_join(score_thread, NULL);
+    pthread_join(input_thread, NULL);
+    pthread_join(highscore_thread, NULL);
 }
